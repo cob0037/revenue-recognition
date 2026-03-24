@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>The Revenue Chronicles — ASC 606 Quest</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,400&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+<style>
+/* =====================================================
+   GAME SETTINGS — easy to tweak
+   ===================================================== */
+:root {
+  --risk-wrong:   5;   /* % audit risk per wrong answer */
+  --risk-timeout: 5;   /* % audit risk per timeout      */
+  --q-time:      30;   /* seconds per question          */
+
+  /* Palette — dark ledger / noir accountant RPG */
+  --void:     #0a0c0f;
+  --deep:     #0f1318;
+  --panel:    #141a22;
+  --surface:  #1c2430;
+  --border:   #2a3545;
+  --border-hi:#3d5068;
+  --ink:      #e8dcc8;
+  --ink-dim:  #8a9aaa;
+  --ink-faint:#3d4e5e;
+  --gold:     #c9a43a;
+  --gold-dim: #7a6020;
+  --red:      #c0392b;
+  --red-dim:  #6b1f18;
+  --green:    #27ae60;
+  --green-dim:#154d2d;
+  --blue:     #2980b9;
+  --amber:    #e67e22;
+
+  --font-title: 'Cinzel', 'Palatino Linotype', serif;
+  --font-body:  'Crimson Pro', Georgia, serif;
+  --font-mono:  'Share Tech Mono', 'Courier New', monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;-webkit-text-size-adjust:100%}
+
+body {
+  background: var(--void);
+  min-height:100vh;
+  font-family: var(--font-body);
+  color: var(--ink);
+  overflow-x: hidden;
+  cursor: default;
+}
+
+/* ── SCANLINE OVERLAY ── */
+body::after {
+  content:'';position:fixed;inset:0;
+  background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.07) 3px);
+  pointer-events:none;z-index:9999;
+}
+
+/* ── PAPER TEXTURE particles ── */
+#bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.4}
+
+/* ── LAYOUT ── */
+.game-shell {
+  position:relative;z-index:1;
+  max-width:780px;margin:0 auto;
+  padding:1.5rem 1rem 5rem;
+  display:flex;flex-direction:column;align-items:center;gap:1.2rem;
+}
+
+/* ── HEADER ── */
+.hdr {
+  text-align:center;width:100%;
+  padding:1.5rem 1rem 1.2rem;
+  border-bottom:1px solid var(--border);
+  position:relative;
+}
+.hdr-ornament {
+  display:flex;align-items:center;justify-content:center;gap:.75rem;
+  margin-bottom:.5rem;
+}
+.hdr-ornament::before,.hdr-ornament::after {
+  content:'';flex:1;height:1px;
+  background:linear-gradient(90deg,transparent,var(--gold-dim));
+}
+.hdr-ornament::after{background:linear-gradient(90deg,var(--gold-dim),transparent)}
+.hdr-badge {
+  font-family:var(--font-mono);font-size:.6rem;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--gold);
+  border:1px solid var(--gold-dim);border-radius:3px;
+  padding:.2rem .6rem;
+}
+h1 {
+  font-family:var(--font-title);
+  font-size:clamp(1.5rem,5.5vw,2.6rem);
+  font-weight:900;letter-spacing:.06em;
+  text-transform:uppercase;
+  color:var(--gold);
+  text-shadow:0 0 40px rgba(201,164,58,.3);
+  line-height:1.1;
+}
+.h1-sub {
+  font-family:var(--font-mono);font-size:.65rem;
+  letter-spacing:.18em;text-transform:uppercase;
+  color:var(--ink-dim);margin-top:.35rem;
+}
+
+/* ── HUD BAR ── */
+.hud {
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:.6rem;width:100%;
+}
+.hud-cell {
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:6px;padding:.55rem .7rem;
+  text-align:center;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+  position:relative;overflow:hidden;
+}
+.hud-cell::before {
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--border-hi),transparent);
+}
+.hud-lbl {
+  font-family:var(--font-mono);font-size:.55rem;
+  letter-spacing:.15em;text-transform:uppercase;
+  color:var(--ink-faint);margin-bottom:.15rem;
+}
+.hud-val {
+  font-family:var(--font-title);font-size:1.5rem;
+  font-weight:700;line-height:1;
+}
+#hv-c{color:var(--green)}
+#hv-w{color:var(--red)}
+#hv-n{color:var(--gold)}
+
+/* ── AUDIT RISK ── */
+.risk-panel {
+  width:100%;background:var(--panel);
+  border:1px solid var(--border);border-radius:8px;
+  padding:.85rem 1rem;
+}
+.risk-top {
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:.6rem;
+}
+.risk-title {
+  display:flex;align-items:center;gap:.5rem;
+  font-family:var(--font-title);font-size:.75rem;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-dim);
+}
+.risk-icon {font-size:1rem;animation:pulse-icon 2s ease-in-out infinite}
+@keyframes pulse-icon{0%,100%{opacity:.6}50%{opacity:1}}
+#risk-val {
+  font-family:var(--font-mono);font-size:.9rem;
+  font-weight:700;color:var(--red);
+  transition:color .4s;
+}
+.risk-track {
+  height:10px;background:var(--deep);
+  border-radius:99px;overflow:hidden;
+  border:1px solid var(--border);
+  position:relative;
+}
+#risk-fill {
+  height:100%;width:0%;border-radius:99px;
+  background:linear-gradient(90deg,#27ae60,#f39c12,#c0392b);
+  background-size:300% 100%;
+  transition:width .6s cubic-bezier(.4,0,.2,1);
+  position:relative;
+}
+#risk-fill::after {
+  content:'';position:absolute;right:0;top:0;bottom:0;
+  width:4px;background:rgba(255,255,255,.6);
+  border-radius:0 99px 99px 0;
+  filter:blur(1px);
+}
+.risk-labels {
+  display:flex;justify-content:space-between;
+  font-family:var(--font-mono);font-size:.5rem;
+  color:var(--ink-faint);margin-top:.3rem;
+  letter-spacing:.06em;
+}
+
+/* ── DOCUMENT / INVOICE ANIMATION STAGE ── */
+.doc-stage {
+  width:100%;position:relative;
+  min-height:200px;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+}
+
+/* Floating doc fragments behind the card */
+.doc-frag {
+  position:absolute;
+  font-family:var(--font-mono);
+  font-size:clamp(.45rem,.9vw,.6rem);
+  color:var(--ink-faint);
+  pointer-events:none;
+  line-height:1.6;
+  white-space:nowrap;
+  opacity:0;
+  animation:float-doc var(--dur,12s) var(--delay,0s) ease-in-out infinite;
+}
+@keyframes float-doc {
+  0%   {opacity:0;transform:translateY(20px) rotate(var(--rot,0deg))}
+  15%  {opacity:.6}
+  85%  {opacity:.4}
+  100% {opacity:0;transform:translateY(-40px) rotate(var(--rot,0deg))}
+}
+
+/* ── MAIN GAME CARD ── */
+.game-card {
+  width:100%;background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:10px;
+  box-shadow:0 8px 40px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05);
+  overflow:hidden;
+  position:relative;
+}
+
+/* Gold left accent */
+.game-card::before {
+  content:'';position:absolute;top:0;left:0;
+  width:4px;height:100%;
+  background:linear-gradient(180deg,var(--gold),var(--gold-dim));
+}
+
+/* Corner stamps */
+.corner-stamp {
+  position:absolute;
+  font-family:var(--font-mono);font-size:.5rem;
+  letter-spacing:.08em;text-transform:uppercase;
+  color:var(--border-hi);opacity:.6;
+}
+.cs-tl{top:.6rem;left:.9rem}
+.cs-tr{top:.6rem;right:.9rem;text-align:right}
+.cs-bl{bottom:.6rem;left:.9rem}
+.cs-br{bottom:.6rem;right:.9rem;text-align:right}
+
+.card-inner{padding:1.4rem 1.5rem 1.6rem}
+
+/* ── TIMER ── */
+.timer-row {
+  display:flex;align-items:center;gap:.7rem;
+  margin-bottom:1rem;
+}
+.t-track {
+  flex:1;height:4px;background:var(--deep);
+  border-radius:99px;overflow:visible;
+  position:relative;
+}
+#t-fill {
+  height:100%;width:100%;
+  background:var(--green);
+  border-radius:99px;
+  transition:width 1s linear,background-color .4s;
+  box-shadow:0 0 6px currentColor;
+}
+#t-num {
+  font-family:var(--font-mono);font-size:.8rem;
+  color:var(--ink-dim);min-width:2.6rem;text-align:right;
+  transition:color .3s;
+}
+
+/* ── QUESTION AREA ── */
+.q-topic {
+  font-family:var(--font-mono);font-size:.58rem;
+  letter-spacing:.16em;text-transform:uppercase;
+  color:var(--gold);margin-bottom:.5rem;
+  display:flex;align-items:center;gap:.4rem;
+}
+.q-topic::before{content:'▸'}
+
+#q-text {
+  font-family:var(--font-body);
+  font-size:1.08rem;font-weight:400;
+  line-height:1.7;color:var(--ink);
+  margin-bottom:1.2rem;
+  animation:text-reveal .4s ease both;
+}
+@keyframes text-reveal {
+  from{opacity:0;transform:translateY(6px)}
+  to  {opacity:1;transform:translateY(0)}
+}
+
+/* ── DOCUMENT PREVIEW (shown beside question) ── */
+.doc-preview {
+  background:var(--deep);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:.75rem 1rem;
+  margin-bottom:1.1rem;
+  font-family:var(--font-mono);
+  font-size:.62rem;
+  line-height:1.8;
+  color:var(--ink-dim);
+  position:relative;
+  overflow:hidden;
+  animation:doc-slide-in .5s cubic-bezier(.4,0,.2,1) both;
+}
+@keyframes doc-slide-in {
+  from{opacity:0;transform:translateX(-10px)}
+  to  {opacity:1;transform:translateX(0)}
+}
+.doc-preview::before {
+  content:'';position:absolute;top:0;left:0;right:0;
+  height:2px;
+  background:linear-gradient(90deg,var(--gold-dim),transparent);
+}
+.doc-header {
+  font-family:var(--font-title);font-size:.7rem;
+  letter-spacing:.1em;color:var(--gold);
+  text-transform:uppercase;margin-bottom:.4rem;
+  display:flex;justify-content:space-between;
+  align-items:center;
+}
+.doc-stamp {
+  font-family:var(--font-mono);font-size:.5rem;
+  border:1px solid var(--red);color:var(--red);
+  padding:.1rem .35rem;border-radius:2px;
+  letter-spacing:.1em;opacity:.7;
+}
+.doc-row {
+  display:flex;justify-content:space-between;
+  border-bottom:1px dotted var(--ink-faint);
+  padding:.1rem 0;
+  animation:row-reveal .3s ease both;
+}
+.doc-row:last-child{border-bottom:none}
+@keyframes row-reveal {
+  from{opacity:0;transform:translateX(-4px)}
+  to  {opacity:.9;transform:translateX(0)}
+}
+.doc-row .dc{color:var(--ink-faint)}
+.doc-row .dv{color:var(--ink)}
+.doc-total {
+  display:flex;justify-content:space-between;
+  border-top:1px solid var(--border-hi);
+  margin-top:.3rem;padding-top:.25rem;
+}
+.doc-total .dc{color:var(--gold);font-weight:600}
+.doc-total .dv{color:var(--gold)}
+
+/* Typing cursor effect on doc numbers */
+.typing {animation:type-in .8s steps(8) both}
+@keyframes type-in{from{opacity:0}to{opacity:1}}
+
+/* ── OPTIONS ── */
+.opts{display:flex;flex-direction:column;gap:.55rem}
+
+.opt {
+  background:transparent;
+  border:1px solid var(--border);
+  border-radius:7px;
+  padding:.75rem 1rem;
+  text-align:left;
+  font-family:var(--font-body);
+  font-size:1rem;
+  color:var(--ink-dim);
+  cursor:pointer;
+  display:flex;align-items:flex-start;gap:.7rem;
+  line-height:1.5;
+  transition:all .15s ease;
+  position:relative;overflow:hidden;
+  -webkit-appearance:none;width:100%;
+  animation:opt-in .3s ease both;
+}
+.opt:nth-child(1){animation-delay:.05s}
+.opt:nth-child(2){animation-delay:.1s}
+.opt:nth-child(3){animation-delay:.15s}
+.opt:nth-child(4){animation-delay:.2s}
+@keyframes opt-in{
+  from{opacity:0;transform:translateX(-8px)}
+  to  {opacity:1;transform:translateX(0)}
+}
+.opt::before {
+  content:'';position:absolute;left:0;top:0;bottom:0;
+  width:3px;background:var(--border-hi);
+  transition:background .15s;border-radius:7px 0 0 7px;
+}
+.opt:hover:not(:disabled) {
+  border-color:var(--border-hi);
+  background:rgba(255,255,255,.03);
+  color:var(--ink);
+  transform:translateX(4px);
+}
+.opt:hover:not(:disabled)::before{background:var(--gold)}
+.opt:active:not(:disabled){transform:translateX(2px)}
+.opt:disabled{cursor:not-allowed}
+
+.ltr {
+  font-family:var(--font-mono);font-size:.65rem;font-weight:600;
+  letter-spacing:.05em;background:var(--deep);
+  color:var(--ink-dim);border:1px solid var(--border);
+  border-radius:4px;padding:.15rem .4rem;
+  flex-shrink:0;margin-top:.15rem;
+  transition:all .15s;
+}
+
+.opt.correct {background:rgba(39,174,96,.1);border-color:var(--green);color:var(--ink)}
+.opt.correct::before{background:var(--green)}
+.opt.correct .ltr{background:var(--green);border-color:var(--green);color:#fff}
+
+.opt.wrong {background:rgba(192,57,43,.1);border-color:var(--red);color:var(--ink)}
+.opt.wrong::before{background:var(--red)}
+.opt.wrong .ltr{background:var(--red);border-color:var(--red);color:#fff}
+
+/* ── EXPLANATION ── */
+#expl {
+  display:none;margin-top:1rem;
+  padding:.9rem 1.1rem;border-radius:7px;
+  font-family:var(--font-body);font-size:.95rem;line-height:1.7;
+  border-left:3px solid var(--gold);
+  background:rgba(201,164,58,.06);
+  color:var(--ink-dim);
+  animation:expl-in .35s ease both;
+}
+@keyframes expl-in{
+  from{opacity:0;transform:translateY(6px)}
+  to  {opacity:1;transform:translateY(0)}
+}
+#expl strong{color:var(--gold);font-style:normal}
+#expl.expl-correct{border-left-color:var(--green);background:rgba(39,174,96,.07)}
+#expl.expl-wrong  {border-left-color:var(--red);  background:rgba(192,57,43,.07)}
+#expl.expl-timeout{border-left-color:var(--amber);background:rgba(230,126,34,.07)}
+
+/* ── NEXT BTN ── */
+#next-btn {
+  display:none;margin-top:1.1rem;
+  padding:.65rem 1.6rem;
+  background:transparent;
+  border:1px solid var(--gold-dim);
+  border-radius:6px;
+  font-family:var(--font-title);font-size:.75rem;
+  font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--gold);
+  cursor:pointer;
+  transition:all .15s;
+  -webkit-appearance:none;
+  position:relative;overflow:hidden;
+}
+#next-btn::before {
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(201,164,58,.08),transparent);
+  transform:translateX(-100%);
+  transition:transform .4s ease;
+}
+#next-btn:hover{border-color:var(--gold);color:var(--gold);box-shadow:0 0 14px rgba(201,164,58,.2)}
+#next-btn:hover::before{transform:translateX(100%)}
+#next-btn:active{transform:scale(.98)}
+
+/* ── FLASH EFFECTS ── */
+@keyframes flash-green {
+  0%,100%{box-shadow:none}
+  50%{box-shadow:0 0 30px rgba(39,174,96,.4),inset 0 0 20px rgba(39,174,96,.08)}
+}
+@keyframes flash-red {
+  0%,100%{box-shadow:none}
+  50%{box-shadow:0 0 30px rgba(192,57,43,.5),inset 0 0 20px rgba(192,57,43,.1)}
+}
+.flash-correct{animation:flash-green .5s ease}
+.flash-wrong  {animation:flash-red   .6s ease}
+
+/* ── SCREEN TRANSITIONS ── */
+.screen{
+  display:none;width:100%;
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:2rem 1.75rem;
+  text-align:center;
+  box-shadow:0 8px 40px rgba(0,0,0,.5);
+  animation:screen-in .5s ease both;
+}
+.screen.active{display:block}
+@keyframes screen-in{
+  from{opacity:0;transform:translateY(12px) scale(.98)}
+  to  {opacity:1;transform:translateY(0) scale(1)}
+}
+
+/* ── START SCREEN ── */
+#ss .screen-ornament {
+  font-family:var(--font-title);font-size:3rem;
+  margin-bottom:.5rem;filter:drop-shadow(0 0 14px rgba(201,164,58,.4));
+}
+#ss h2 {
+  font-family:var(--font-title);
+  font-size:clamp(1.3rem,4.5vw,1.9rem);
+  font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--gold);
+  margin-bottom:.6rem;
+}
+#ss .lore {
+  font-size:1rem;line-height:1.8;
+  color:var(--ink-dim);margin-bottom:1.4rem;
+  font-style:italic;
+}
+.scroll-rules {
+  background:var(--deep);border:1px solid var(--border);
+  border-radius:8px;padding:1rem 1.2rem;
+  margin-bottom:1.5rem;text-align:left;
+}
+.scroll-rules h3 {
+  font-family:var(--font-title);font-size:.72rem;
+  letter-spacing:.12em;text-transform:uppercase;
+  color:var(--gold-dim);margin-bottom:.7rem;
+  text-align:center;
+}
+.rule-line {
+  display:flex;align-items:flex-start;gap:.65rem;
+  padding:.35rem 0;
+  border-bottom:1px dotted var(--ink-faint);
+  font-size:.9rem;color:var(--ink-dim);
+}
+.rule-line:last-child{border-bottom:none}
+.rule-ico{font-size:.9rem;flex-shrink:0;margin-top:.05rem}
+
+/* ── END SCREEN ── */
+#es h2 {
+  font-family:var(--font-title);
+  font-size:clamp(1.3rem,4.5vw,1.9rem);
+  font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--gold);
+  margin-bottom:.4rem;
+}
+.final-doc {
+  background:var(--deep);border:1px solid var(--border);
+  border-radius:8px;padding:1.1rem 1.2rem;
+  margin:1rem 0 1.2rem;text-align:left;
+  font-family:var(--font-mono);font-size:.7rem;
+  position:relative;overflow:hidden;
+}
+.final-doc::before {
+  content:'AUDIT REPORT — CONFIDENTIAL';
+  position:absolute;top:.45rem;right:.7rem;
+  font-size:.48rem;letter-spacing:.12em;
+  color:var(--red);border:1px solid var(--red-dim);
+  padding:.1rem .3rem;border-radius:2px;opacity:.6;
+}
+.fd-title {
+  font-family:var(--font-title);font-size:.8rem;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:var(--gold);margin-bottom:.75rem;
+}
+.fd-row {
+  display:flex;justify-content:space-between;
+  padding:.25rem 0;border-bottom:1px dotted var(--ink-faint);
+  color:var(--ink-dim);
+}
+.fd-row:last-of-type{border-bottom:none}
+.fd-row .fv{color:var(--ink)}
+.fd-verdict {
+  margin-top:.8rem;padding:.7rem .9rem;
+  border-radius:6px;border:1px solid var(--border-hi);
+  font-family:var(--font-body);font-size:.92rem;
+  line-height:1.7;font-style:italic;color:var(--ink-dim);
+}
+
+/* ── BIG BUTTON ── */
+.big-btn {
+  padding:.85rem 2.2rem;
+  background:linear-gradient(135deg,var(--gold-dim),var(--gold));
+  color:var(--void);border:none;border-radius:7px;
+  font-family:var(--font-title);font-size:.88rem;
+  font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  cursor:pointer;
+  transition:all .15s;
+  box-shadow:0 4px 20px rgba(201,164,58,.25);
+  -webkit-appearance:none;
+}
+.big-btn:hover{
+  background:linear-gradient(135deg,var(--gold),#e8c050);
+  transform:translateY(-2px);
+  box-shadow:0 6px 28px rgba(201,164,58,.4);
+}
+.big-btn:active{transform:translateY(0)}
+
+/* ── XP POPUP ── */
+.xp-pop {
+  position:fixed;top:20%;left:50%;
+  transform:translate(-50%,-50%);
+  font-family:var(--font-title);font-size:2rem;
+  font-weight:900;letter-spacing:.08em;
+  pointer-events:none;z-index:1000;
+  animation:xp-burst .9s ease both;
+  text-shadow:0 0 20px currentColor;
+}
+@keyframes xp-burst{
+  0%  {opacity:0;transform:translate(-50%,-50%) scale(.6)}
+  25% {opacity:1;transform:translate(-50%,-60%) scale(1.1)}
+  70% {opacity:1;transform:translate(-50%,-80%) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-110%) scale(.9)}
+}
+
+/* ── MOBILE ── */
+@media(max-width:480px){
+  .game-shell{padding:1rem .7rem 4rem;gap:1rem}
+  .hud-val{font-size:1.25rem}
+  .card-inner{padding:1rem 1.05rem 1.2rem}
+  .doc-preview{font-size:.58rem}
+  .opt{font-size:.94rem;padding:.65rem .85rem}
+  #q-text{font-size:1rem}
+  .screen{padding:1.5rem 1.2rem}
+}
+@media(max-width:360px){
+  h1{font-size:1.35rem}
+  .hud{grid-template-columns:1fr 1fr 1fr}
+}
+@media(hover:none){
+  .opt{min-height:50px}
+  #next-btn,.big-btn{min-height:46px}
+}
+</style>
+</head>
+<body>
+
+<!-- Floating background canvas -->
+<canvas id="bg-canvas"></canvas>
+
+<div class="game-shell">
+
+  <!-- HEADER -->
+  <header class="hdr">
+    <div class="hdr-ornament"><span class="hdr-badge">ASC 606 · IFRS 15</span></div>
+    <h1>The Revenue Chronicles</h1>
+    <div class="h1-sub">A Revenue Recognition Quest</div>
+  </header>
+
+  <!-- START SCREEN -->
+  <div id="ss" class="screen active">
+    <div class="screen-ornament">⚖️</div>
+    <h2>The Ledger Awaits</h2>
+    <p class="lore">"You are Junior Auditor Vex, summoned to the haunted offices of Meridian Corp. Their books are in chaos. Revenue has been recognized in places it doesn't belong, performance obligations lurk in the shadows, and the Audit Risk grows with every wrong answer. Only mastery of ASC 606 will restore order to the realm."</p>
+    <div class="scroll-rules">
+      <h3>⚔ Rules of Engagement</h3>
+      <div class="rule-line"><span class="rule-ico">📜</span><span>30 questions drawn from financial documents, invoices, and contracts</span></div>
+      <div class="rule-line"><span class="rule-ico">⏱</span><span>30 seconds per question — the clock ticks like a tax deadline</span></div>
+      <div class="rule-line"><span class="rule-ico">📈</span><span>Each wrong answer or timeout raises Audit Risk by <strong>5%</strong></span></div>
+      <div class="rule-line"><span class="rule-ico">🏆</span><span>Answer correctly to earn XP and keep Meridian Corp out of trouble</span></div>
+    </div>
+    <button class="big-btn" onclick="startGame()">Begin the Audit →</button>
+  </div>
+
+  <!-- HUD (shown during game) -->
+  <div id="hud-bar" style="display:none;width:100%">
+    <div class="hud">
+      <div class="hud-cell"><div class="hud-lbl">XP Earned</div><div class="hud-val" id="hv-c">0</div></div>
+      <div class="hud-cell"><div class="hud-lbl">Findings</div><div class="hud-val" id="hv-w">0</div></div>
+      <div class="hud-cell"><div class="hud-lbl">Document</div><div class="hud-val" id="hv-n">1/30</div></div>
+    </div>
+  </div>
+
+  <!-- RISK METER -->
+  <div id="risk-panel" class="risk-panel" style="display:none">
+    <div class="risk-top">
+      <div class="risk-title"><span class="risk-icon">⚠</span> Audit Risk Level</div>
+      <div id="risk-val">0%</div>
+    </div>
+    <div class="risk-track"><div id="risk-fill"></div></div>
+    <div class="risk-labels">
+      <span>CLEAN</span><span>QUALIFIED</span><span>ADVERSE</span><span>MATERIAL WEAKNESS</span>
+    </div>
+  </div>
+
+  <!-- GAME CARD -->
+  <div id="game-card" class="game-card" style="display:none">
+    <span class="corner-stamp cs-tl" id="cs-ref">REF: MER-001</span>
+    <span class="corner-stamp cs-tr" id="cs-step">STEP 1</span>
+    <span class="corner-stamp cs-bl">CONFIDENTIAL</span>
+    <span class="corner-stamp cs-br" id="cs-date">FY 2025</span>
+
+    <div class="card-inner">
+      <div class="timer-row">
+        <div class="t-track"><div id="t-fill"></div></div>
+        <div id="t-num">0:30</div>
+      </div>
+
+      <div class="q-topic" id="q-topic"></div>
+      <div id="q-text"></div>
+
+      <!-- Animated document / invoice snippet -->
+      <div class="doc-preview" id="doc-preview"></div>
+
+      <div class="opts" id="opts"></div>
+      <div id="expl"></div>
+      <button id="next-btn" onclick="nextQ()">Next Document →</button>
+    </div>
+  </div>
+
+  <!-- END SCREEN -->
+  <div id="es" class="screen">
+    <div class="screen-ornament" id="end-icon">📋</div>
+    <h2 id="et">Audit Complete</h2>
+    <div class="final-doc">
+      <div class="fd-title">Meridian Corp — Engagement Summary</div>
+      <div class="fd-row"><span>Questions Reviewed</span><span class="fv">30</span></div>
+      <div class="fd-row"><span>Correct Answers (XP)</span><span class="fv" id="fc-c" style="color:var(--green)">0</span></div>
+      <div class="fd-row"><span>Audit Findings</span><span class="fv" id="fc-w" style="color:var(--red)">0</span></div>
+      <div class="fd-row"><span>Final Audit Risk</span><span class="fv" id="fc-r" style="color:var(--amber)">0%</span></div>
+      <div class="fd-verdict" id="verdict"></div>
+    </div>
+    <button class="big-btn" onclick="restartGame()">New Engagement →</button>
+  </div>
+
+</div><!-- end game-shell -->
+
+<script>
+/* ================================================================
+   QUESTION BANK — add / edit questions freely.
+   Each object: topic, q, doc (invoice/statement snippet shown),
+   options[4], answer (0-based), explain
+   ================================================================ */
+const ALL_QUESTIONS = [
+  // ── STEP 1: IDENTIFY THE CONTRACT ────────────────────────────
+  {
+    topic:"Step 1 · Identify the Contract",
+    q:"Meridian Corp's sales team signed a verbal agreement with a client for $80,000 in consulting services. The client has spotty payment history — collection is only 50% probable. Should Meridian recognize revenue?",
+    doc:{title:"CONTRACT ASSESSMENT — MERIDIAN CORP",stamp:"UNDER REVIEW",rows:[["Contract Form","Verbal Agreement"],["Signed Date","Nov 12, 2025"],["Collection Probability","~50%"],["Commercial Substance","Yes"]],total:["Contract Value","$80,000"]},
+    options:["Yes — a verbal contract is still a legal contract","Yes — recognize 50% of $80,000 now","No — probable collection is required for a valid ASC 606 contract","No — verbal contracts are always excluded from ASC 606"],
+    answer:2,
+    explain:"Probable collection is one of five criteria that must ALL be met before a contract exists under ASC 606. At 50%, collection is not probable — so no revenue is recognized until the uncertainty is resolved, even if some services have been delivered."
+  },
+  {
+    topic:"Step 1 · Identify the Contract",
+    q:"Meridian Corp exchanges IT services (FMV $45,000) with a law firm in exchange for legal consulting (FMV $45,000). No cash changes hands. How should Meridian account for this?",
+    doc:{title:"BARTER EXCHANGE AGREEMENT",stamp:"NON-CASH",rows:[["Meridian Provides","IT Services"],["FMV of IT Services","$45,000"],["Receives in Return","Legal Consulting"],["FMV of Legal Consulting","$45,000"]],total:["Commercial Substance","YES"]},
+    options:["No revenue — no cash was exchanged","Recognize $45,000 in revenue — the exchange has commercial substance","Only recognize if cash is eventually received","Defer until IRS ruling is obtained"],
+    answer:1,
+    explain:"ASC 606 includes non-cash (barter) consideration when the exchange has commercial substance. Meridian recognizes $45,000 in revenue measured at the fair value of what it receives."
+  },
+  {
+    topic:"Step 1 · Identify the Contract",
+    q:"Meridian adds new deliverables to an existing contract at the client's requested standalone selling price of $12,000. Under ASC 606, this modification is treated as:",
+    doc:{title:"CONTRACT MODIFICATION — AMENDMENT 3",stamp:"AMENDMENT",rows:[["Original Contract","$200,000"],["New Deliverable Added","Software Module"],["Module Standalone SSP","$12,000"],["Module Quoted Price","$12,000"]],total:["Total Revised Contract","$212,000"]},
+    options:["A separate contract — priced at standalone selling price","Termination of old contract, creation of new combined contract","A catch-up adjustment to prior revenue","An error in original contract requiring restatement"],
+    answer:0,
+    explain:"When a modification adds distinct goods/services at their standalone selling price, ASC 606 treats it as a separate, new contract. The original $200,000 contract is unaffected."
+  },
+  {
+    topic:"Step 1 · Identify the Contract",
+    q:"Meridian Corp has not yet signed paperwork with a client but has been delivering services under an implied arrangement for 3 months with regular payments. Is this a valid ASC 606 contract?",
+    doc:{title:"REVENUE REVIEW — INFORMAL ARRANGEMENT",stamp:"ORAL/IMPLIED",rows:[["Written Agreement","None — implied conduct"],["Regular Payments Received","Yes — 3 months"],["Services Delivered","Yes — ongoing"],["Client Acceptance","Implied by payment"]],total:["Contract Probable?","ASSESS CRITERIA"]},
+    options:["No — all ASC 606 contracts must be written","Yes — if all five contract criteria are met, including implicit agreements","Only if the client signs within 30 days retroactively","Yes, but only 50% of revenue can be recognized"],
+    answer:1,
+    explain:"ASC 606 explicitly states contracts can be oral, written, or implied by customary business practices. If all five criteria are met (approval, identifiable rights, payment terms, commercial substance, probable collection), revenue recognition is appropriate."
+  },
+  // ── STEP 2: PERFORMANCE OBLIGATIONS ──────────────────────────
+  {
+    topic:"Step 2 · Performance Obligations",
+    q:"Meridian bundles a software license with 12 months of support. Both items are sold separately. The invoice shows a single price of $9,600. How many performance obligations exist?",
+    doc:{title:"SALES INVOICE #4821",stamp:"BUNDLE SALE",rows:[["Software License (standalone $8,000)","—"],["12-Mo Support (standalone $2,400)","—"],["Bundle Discount Applied","($800)"]],total:["Invoice Total","$9,600"]},
+    options:["One — they are billed together","Two — the license and support are each distinct","Three — license, install, and support","Zero — it's a subscription so different rules apply"],
+    answer:1,
+    explain:"Each item is distinct: (1) the customer can benefit from each independently, and (2) they are separately identifiable with standalone selling prices. Two distinct performance obligations → allocate the $9,600 across both."
+  },
+  {
+    topic:"Step 2 · Performance Obligations",
+    q:"Meridian is building a custom data center for a client. The contract includes cabling, servers, cooling, and security systems. How many performance obligations?",
+    doc:{title:"CONSTRUCTION CONTRACT — DC-7",stamp:"FIXED PRICE",rows:[["Cabling & Infrastructure","Included"],["Server Installation","Included"],["Cooling Systems","Included"],["Security Integration","Included"]],total:["Contract Value","$1,200,000"]},
+    options:["Four — each system is separately identifiable","Two — hardware and installation are separate","One — all components are inputs to the single output (completed data center)","None — revenue is deferred until handover"],
+    answer:2,
+    explain:"When individual components are highly interrelated inputs used to produce one combined output (the functioning data center), they are not separately identifiable. One performance obligation exists: delivery of the completed, operating data center."
+  },
+  {
+    topic:"Step 2 · Performance Obligations",
+    q:"Meridian sells a franchise package: brand license, one-week initial training, and ongoing marketing support. Training is available from other providers. How many obligations?",
+    doc:{title:"FRANCHISE AGREEMENT #F-031",stamp:"MULTI-ELEMENT",rows:[["Brand License","Ongoing"],["Initial Training (1 week)","Third-party available"],["Marketing Support","Monthly"],["Onboarding Fee","$50,000"]],total:["Annual Royalty","$12,000/yr"]},
+    options:["One — everything serves the franchise relationship","Two — license + training/marketing combined","Three — license, training, and marketing support are each distinct","None — franchise deals use special lease accounting"],
+    answer:2,
+    explain:"All three items meet the 'distinct' test: each can be obtained from other sources and is separately identifiable. Three distinct performance obligations: brand license, initial training, and ongoing marketing support."
+  },
+  {
+    topic:"Step 2 · Performance Obligations",
+    q:"Meridian sells a cloud platform subscription that includes storage, compute, and 24/7 support — all inseparably integrated. The client cannot use compute without storage, or support without compute. How many obligations?",
+    doc:{title:"CLOUD SUBSCRIPTION — ENTERPRISE TIER",stamp:"INTEGRATED",rows:[["Compute (min. config req'd)","Included"],["Storage (compute-dependent)","Included"],["24/7 Support (platform-only)","Included"],["Monthly Fee","$5,000"]],total:["Contract Term","24 months"]},
+    options:["Three — each component has its own value","Two — infrastructure and support","One — highly interrelated, not separately identifiable","Zero — subscription revenue is straight-lined only"],
+    answer:2,
+    explain:"When elements are highly interdependent and not separately identifiable (compute requires storage, support is useless without the platform), they form one combined performance obligation. Revenue is recognized ratably over the 24-month term."
+  },
+  // ── STEP 3: TRANSACTION PRICE ─────────────────────────────────
+  {
+    topic:"Step 3 · Transaction Price",
+    q:"Meridian offers a $2,000 volume rebate if the client spends $25,000+ this quarter. The client has a 75% chance of hitting the threshold. Using the expected value method, what revenue is recorded on a $25,000 sale?",
+    doc:{title:"REBATE PROGRAM — Q4 2025",stamp:"VARIABLE CONSIDERATION",rows:[["Gross Sale Amount","$25,000"],["Volume Threshold","$25,000"],["Rebate if Threshold Met","($2,000)"],["Probability of Threshold","75%"]],total:["Expected Value of Rebate","($1,500)"]},
+    options:["$25,000 — recognize in full until rebate is actually claimed","$23,000 — always subtract full rebate","$23,500 — reduce by expected rebate ($2,000 × 75%)","$25,000 — volume rebates are operating expenses, not revenue deductions"],
+    answer:2,
+    explain:"Variable consideration must be estimated. Expected rebate = $2,000 × 75% = $1,500. Revenue = $25,000 − $1,500 = $23,500. This is also subject to the constraint that no significant revenue reversal is probable."
+  },
+  {
+    topic:"Step 3 · Transaction Price",
+    q:"Meridian earns a $40,000 fee plus a $10,000 performance bonus if the project finishes on time (30% probability). Using the most-likely-amount method, the transaction price is:",
+    doc:{title:"CONSULTING ENGAGEMENT — PROJECT APEX",stamp:"CONTINGENT FEE",rows:[["Base Fee","$40,000"],["On-Time Bonus","$10,000"],["Probability (on time)","30%"],["Probability (delayed)","70%"]],total:["Most Likely Outcome","?"]},
+    options:["$43,000 — expected value method","$50,000 — always include the full bonus","$40,000 — 'no bonus' is the more probable outcome","$45,000 — blend the two outcomes"],
+    answer:2,
+    explain:"The most-likely-amount method selects the single most probable outcome. Since delay (70%) is more likely than on-time (30%), the transaction price is $40,000. The expected value method would yield $43,000 — choice depends on which better predicts the entitled amount."
+  },
+  {
+    topic:"Step 3 · Transaction Price",
+    q:"Meridian receives $60,000 upfront for a 4-year managed services contract. A significant financing component exists. What is the correct accounting?",
+    doc:{title:"ADVANCE PAYMENT RECEIPT",stamp:"FINANCING COMPONENT",rows:[["Cash Received Upfront","$60,000"],["Service Period","4 years"],["Implied Interest Rate","6%"],["PV of $60,000 @ 6% / 4yr","~$47,536"]],total:["Financing Component","~$12,464"]},
+    options:["Recognize all $60,000 immediately — cash was received","No adjustment needed — prepayments never trigger financing components","Record PV of contract as revenue; recognize interest expense over 4 years","Refund the $12,464 financing component to the client"],
+    answer:2,
+    explain:"A significant financing component requires adjusting the transaction price to reflect time value of money. Record the present value ($47,536) as the contract liability and recognize interest expense over the 4-year period. Practical expedient applies to contracts ≤ 1 year."
+  },
+  {
+    topic:"Step 3 · Transaction Price",
+    q:"Meridian receives equipment (FMV $95,000) as partial consideration in a $300,000 contract. How is the equipment measured?",
+    doc:{title:"CONTRACT — PARTIAL NON-CASH CONSIDERATION",stamp:"NON-CASH",rows:[["Cash Component","$205,000"],["Equipment Received (non-cash)","—"],["Equipment FMV at Signing","$95,000"],["Equipment Book Value (client)","$60,000"]],total:["Total Contract Value","$300,000"]},
+    options:["At the contract's cash equivalent value of $300,000","At the equipment's fair value of $95,000 at contract inception","At the client's book value of $60,000","Excluded — non-cash consideration is never included"],
+    answer:1,
+    explain:"ASC 606 measures non-cash consideration at its fair value at contract inception — $95,000 here. The client's book value is irrelevant. Total transaction price = $205,000 cash + $95,000 FMV = $300,000."
+  },
+  // ── STEP 4: ALLOCATE TRANSACTION PRICE ───────────────────────
+  {
+    topic:"Step 4 · Allocate Transaction Price",
+    q:"Meridian sells a bundle for $800. Product A SSP = $600, Service B SSP = $400 (total SSP = $1,000). How much is allocated to Service B?",
+    doc:{title:"ALLOCATION SCHEDULE — BUNDLE #B-77",stamp:"ALLOCATION",rows:[["Product A (SSP)","$600"],["Service B (SSP)","$400"],["Total SSP","$1,000"],["Bundle Price","$800"]],total:["Discount to Allocate","($200)"]},
+    options:["$400 — use the standalone price","$320 — ($400/$1,000) × $800","$400 — discount stays entirely with Product A","$200 — half the bundle price"],
+    answer:1,
+    explain:"Allocate based on relative SSPs: Service B = ($400 / $1,000) × $800 = $320. Product A = ($600 / $1,000) × $800 = $480. The $200 discount is spread proportionately across both obligations."
+  },
+  {
+    topic:"Step 4 · Allocate Transaction Price",
+    q:"Meridian cannot directly observe an SSP for a new service. Which estimation method should be avoided?",
+    doc:{title:"SSP ESTIMATION — ADVISORY SERVICE",stamp:"NO MARKET DATA",rows:[["Direct Observable SSP","Not Available"],["Market Assessment Est.","Available"],["Cost + Margin Est.","Available"],["Residual Method","Available if SSP highly variable"]],total:["Recommended Method","?"]},
+    options:["Adjusted market assessment approach","Expected cost plus a reasonable margin","Residual approach — use last, only if SSP is highly variable","Comparable transaction analysis"],
+    answer:2,
+    explain:"The residual approach is the least preferred method and may only be used when the SSP is highly variable or uncertain. Adjusted market assessment and cost-plus-margin approaches are generally preferred when observable prices are unavailable."
+  },
+  {
+    topic:"Step 4 · Allocate Transaction Price",
+    q:"Observable evidence shows Meridian consistently sells Item X at a 20% discount. In a bundle, the discount should be:",
+    doc:{title:"DISCOUNT ALLOCATION ANALYSIS",stamp:"OBSERVABLE EVIDENCE",rows:[["Item X Regular SSP","$1,000"],["Item X Consistently Sold At","$800"],["Discount on Item X","20%"],["Bundle Includes","Item X + Item Y"]],total:["Discount Allocation","EVALUATE"]},
+    options:["Spread proportionately across Item X and Item Y","Allocated entirely to Item X — observable evidence supports this","Recognized as a separate contract liability","Ignored if under 15% of total transaction price"],
+    answer:1,
+    explain:"When observable evidence shows that a discount relates specifically to one or more (but not all) performance obligations, ASC 606 allows allocating the discount entirely to those specific obligations, rather than spreading it proportionately."
+  },
+  // ── STEP 5: RECOGNIZE REVENUE ─────────────────────────────────
+  {
+    topic:"Step 5 · Recognize Revenue",
+    q:"Meridian provides weekly payroll processing services to 50 clients. Clients receive and consume the benefit immediately after each run. Revenue is recognized:",
+    doc:{title:"PAYROLL PROCESSING — SERVICE LOG",stamp:"RECURRING",rows:[["Service Type","Weekly payroll processing"],["Clients","50 entities"],["Benefit Timing","Immediately after each run"],["Invoice Frequency","Monthly in arrears"]],total:["Contract Value","$2,400/month"]},
+    options:["Monthly when invoices are issued","Annually at contract renewal","Over time — clients simultaneously receive and consume the benefit as Meridian performs","At a point in time when each check run is sent"],
+    answer:2,
+    explain:"Payroll processing is consumed immediately as performed — there's no 'pre-processed' payroll the client can access later. This satisfies the over-time criterion: customer simultaneously receives and consumes benefits as the entity performs."
+  },
+  {
+    topic:"Step 5 · Recognize Revenue",
+    q:"Meridian builds a custom analytics platform with no resale value to other clients and has an enforceable right to payment for work done. Revenue should be recognized:",
+    doc:{title:"DEVELOPMENT CONTRACT — ANALYTICS ENGINE",stamp:"CUSTOM BUILD",rows:[["Alternative Use to Meridian","None — fully customized"],["Right to Payment for Work Done","Yes — contract clause 14.2"],["Est. Completion","8 months"],["Fixed Price","$480,000"]],total:["Method","OVER TIME?"]},
+    options:["Only when the platform is delivered and accepted","Over time — no alternative use and right to payment for work to date","Only when each sprint is approved by the client","Ratably over the 8-month calendar period regardless of progress"],
+    answer:1,
+    explain:"Two over-time criteria are satisfied: (1) the asset has no alternative use (fully customized), and (2) there is an enforceable right to payment for performance completed to date. Revenue is recognized using a progress measure such as cost-to-cost."
+  },
+  {
+    topic:"Step 5 · Recognize Revenue",
+    q:"Meridian uses the cost-to-cost method on a $600,000 contract. Costs incurred to date: $180,000. Total estimated costs: $450,000. Revenue recognized to date should be:",
+    doc:{title:"PROGRESS BILLING — PROJECT NOVA",stamp:"COST-TO-COST",rows:[["Total Contract Price","$600,000"],["Costs Incurred to Date","$180,000"],["Total Estimated Costs","$450,000"],["Completion %","40%"]],total:["Revenue to Recognize","?"]},
+    options:["$180,000 — just the costs incurred","$240,000 — 40% of $600,000","$150,000 — costs incurred / contract price","$270,000 — 45% milestone estimate"],
+    answer:1,
+    explain:"Cost-to-cost progress = $180,000 / $450,000 = 40%. Revenue recognized = 40% × $600,000 = $240,000. This input method faithfully depicts progress toward complete satisfaction of the performance obligation."
+  },
+  {
+    topic:"Step 5 · Recognize Revenue",
+    q:"Meridian ships goods FOB Shipping Point to a client. The goods are in transit. Revenue should be recognized:",
+    doc:{title:"SHIPPING NOTICE #SH-2291",stamp:"FOB SHIPPING POINT",rows:[["FOB Terms","Shipping Point"],["Shipment Date","Dec 28, 2025"],["Expected Arrival","Jan 3, 2026"],["Risk of Loss","Transfers at shipment"]],total:["Revenue Recognition Date","?"]},
+    options:["January 3, 2026 — when the client receives delivery","December 28, 2025 — when goods leave Meridian's warehouse","When the client pays the invoice","When the client formally accepts the shipment"],
+    answer:1,
+    explain:"FOB Shipping Point means control (legal title and risk of loss) transfers to the buyer when goods leave the seller's facility. Revenue is recognized on December 28 at the point of shipment."
+  },
+  {
+    topic:"Step 5 · Recognize Revenue",
+    q:"Meridian ships goods FOB Destination. Goods are in transit over year-end (Dec 31). When should revenue be recognized?",
+    doc:{title:"YEAR-END SHIPPING LOG",stamp:"FOB DESTINATION",rows:[["FOB Terms","Destination"],["Shipped","Dec 29, 2025"],["Estimated Delivery","Jan 2, 2026"],["Risk of Loss in Transit","Meridian's risk"]],total:["FY 2025 Revenue?","TBD"]},
+    options:["December 29 — date of shipment","December 31 — year-end cut-off","January 2, 2026 — when client receives delivery","When client signs the delivery receipt"],
+    answer:2,
+    explain:"FOB Destination means the seller retains control (and risk of loss) until goods arrive at the client's location. Revenue is recognized on January 2, 2026, not in FY 2025. This is a common year-end cut-off error."
+  },
+  // ── CONTRACT ASSETS & LIABILITIES ────────────────────────────
+  {
+    topic:"Contract Assets & Liabilities",
+    q:"Meridian completes Phase 1 of a two-phase project but the contract only allows invoicing upon completion of both phases. After Phase 1, Meridian records:",
+    doc:{title:"PROJECT MILESTONE SCHEDULE",stamp:"TWO-PHASE CONTRACT",rows:[["Phase 1 Value (est.)","$120,000"],["Phase 2 Value (est.)","$130,000"],["Invoicing Trigger","Both phases complete"],["Phase 1 Status","COMPLETE"]],total:["Right to Invoice?","NOT YET"]},
+    options:["Accounts receivable of $120,000","A contract asset of $120,000 — revenue earned but conditional on Phase 2","Deferred revenue of $120,000","No entry until Phase 2 is also complete"],
+    answer:1,
+    explain:"A contract asset arises when the entity has satisfied a performance obligation but its right to consideration is conditional on completing another obligation (Phase 2). Unlike accounts receivable, this is NOT an unconditional right to payment."
+  },
+  {
+    topic:"Contract Assets & Liabilities",
+    q:"Meridian receives $24,000 upfront for a 12-month subscription starting next month. How is this recorded at the time of receipt?",
+    doc:{title:"ADVANCE PAYMENT RECEIPT #AP-0047",stamp:"PREPAYMENT",rows:[["Client","Thornfield Analytics"],["Service Period","Jan 1 – Dec 31, 2026"],["Payment Received","Dec 1, 2025"],["Monthly Value","$2,000"]],total:["Cash Received","$24,000"]},
+    options:["Revenue of $24,000 — cash received","Contract asset of $24,000","Deferred revenue (contract liability) of $24,000","Accounts receivable of $24,000"],
+    answer:2,
+    explain:"Cash received before performance creates a contract liability (deferred revenue). Journal entry: Debit Cash $24,000 / Credit Deferred Revenue $24,000. As each month of service is delivered, $2,000 is reclassified to revenue."
+  },
+  {
+    topic:"Contract Assets & Liabilities",
+    q:"What distinguishes a contract asset from accounts receivable on Meridian's balance sheet?",
+    doc:{title:"BALANCE SHEET CLASSIFICATION",stamp:"ASC 606 DISCLOSURE",rows:[["Accounts Receivable","Unconditional right to payment"],["Contract Asset","Conditional right to payment"],["Contract Liability","Obligation to transfer goods/services"],["Key Differentiator","Nature of the right"]],total:["Authoritative Guidance","ASC 606-10-45"]},
+    options:["Contract assets are always larger","Accounts receivable is unconditional; contract asset is conditioned on future performance","Contract assets only appear in long-term contracts","They are interchangeable under ASC 606"],
+    answer:1,
+    explain:"Accounts receivable = unconditional right (only passage of time required). Contract asset = right conditioned on completing another performance obligation. Both are assets, but classified differently based on the conditionality of the right to payment."
+  },
+  // ── PRINCIPAL vs. AGENT ───────────────────────────────────────
+  {
+    topic:"Principal vs. Agent",
+    q:"Meridian acts as an online marketplace — vendors sell through Meridian's platform and Meridian earns 12% of each sale. Meridian never takes possession of inventory. Revenue should be:",
+    doc:{title:"MARKETPLACE REVENUE REPORT — OCT 2025",stamp:"AGENT ARRANGEMENT",rows:[["Gross Sales Facilitated","$500,000"],["Meridian Commission (12%)","$60,000"],["Inventory Held by Meridian","None"],["Control Before Transfer","No"]],total:["Revenue to Recognize","?"]},
+    options:["$500,000 gross — Meridian processes all transactions","$60,000 net — Meridian is an agent and earns only its commission","$250,000 — 50% as primary facilitator","Only recognize when vendors pay Meridian monthly"],
+    answer:1,
+    explain:"Meridian is an agent because it never controls the goods before they transfer to the customer. Agents recognize revenue on a net basis — only the fee or commission. Gross recognition would overstate Meridian's economic activity."
+  },
+  {
+    topic:"Principal vs. Agent",
+    q:"Meridian purchases consulting software licenses, repackages them with its own training content, and sells the bundle under its own brand. Which indicator confirms Meridian is the PRINCIPAL?",
+    doc:{title:"RESELLER AGREEMENT — LICENSE BUNDLE",stamp:"PRINCIPAL ASSESSMENT",rows:[["Purchases Licenses Outright","Yes"],["Repackages Under Own Brand","Yes"],["Controls Bundle Before Sale","Yes"],["Risk of Unsold Inventory","Yes"]],total:["Principal or Agent?","ASSESS"]},
+    options:["Meridian earns a markup — that makes it an agent","Meridian controls the bundle before transferring it to the customer — principal indicator","Meridian's name on the invoice determines principal status","Meridian has a written agreement with the software vendor"],
+    answer:1,
+    explain:"The defining indicator of principal status is CONTROL — Meridian controls the combined bundle before it transfers to the customer. Principals recognize gross revenue; they also bear inventory risk and have discretion in setting prices."
+  },
+  // ── LICENSES ─────────────────────────────────────────────────
+  {
+    topic:"Licenses",
+    q:"Meridian licenses its proprietary analytics software (functional IP) for a 3-year term. No updates or enhancements are promised. Revenue is recognized:",
+    doc:{title:"SOFTWARE LICENSE AGREEMENT #SL-889",stamp:"FUNCTIONAL IP",rows:[["IP Type","Functional (software)"],["License Term","3 years"],["Updates Promised?","No"],["Standalone Price","$90,000"]],total:["Recognition Pattern","?"]},
+    options:["Ratably over the 3-year term","At a point in time when the license is granted — right to use as it exists today","Only when the client activates the software","Annually at each contract anniversary"],
+    answer:1,
+    explain:"Functional IP (software, completed media) gives the customer the right to USE the IP as it exists at the grant date. Revenue is recognized at that point in time — unless the entity promises to maintain or enhance the IP's utility throughout the term."
+  },
+  {
+    topic:"Licenses",
+    q:"Meridian licenses its famous 'Ledger Lion' brand character (symbolic IP) to a toy company for 2 years. Revenue is recognized:",
+    doc:{title:"BRAND LICENSE — LEDGER LION",stamp:"SYMBOLIC IP",rows:[["IP Type","Symbolic (brand character)"],["License Term","2 years"],["Royalties","5% of net sales"],["Minimum Guarantee","$30,000"]],total:["Recognition Pattern","?"]},
+    options:["At the point the license is signed — right to use today's brand","Over time — the licensee has the right to ACCESS the brand as it evolves","Only when royalties are paid","At the end of each year"],
+    answer:1,
+    explain:"Symbolic IP (brands, characters, trade names) provides the right to ACCESS the IP as it exists throughout the license period. This is an over-time obligation — the brand's value is dynamic and the licensee is paying for ongoing access."
+  },
+  // ── WARRANTIES ───────────────────────────────────────────────
+  {
+    topic:"Warranties",
+    q:"Meridian sells hardware with a standard 1-year warranty guaranteeing the product will function as specified. This warranty is:",
+    doc:{title:"PRODUCT WARRANTY TERMS",stamp:"STANDARD WARRANTY",rows:[["Warranty Type","Standard 1-year"],["Covers","Defects in materials/workmanship"],["Extra Services Included?","No"],["Customer Can Purchase Separately?","No"]],total:["Classification","?"]},
+    options:["A separate performance obligation recognized over 1 year","An assurance warranty — accrued as a cost, not a separate revenue obligation","Deferred revenue equal to expected warranty costs","No accounting entry needed"],
+    answer:1,
+    explain:"Assurance warranties simply guarantee the product meets promised specs. They are NOT separate performance obligations under ASC 606. Instead, they are accrued as a liability under warranty cost guidance (ASC 450)."
+  },
+  {
+    topic:"Warranties",
+    q:"Meridian offers an optional 2-year extended warranty for an additional $200 fee. Clients can choose whether or not to purchase it. This is:",
+    doc:{title:"EXTENDED WARRANTY OFFERING",stamp:"OPTIONAL SERVICE",rows:[["Standard Warranty","1 year — included"],["Extended Warranty","2 additional years"],["Extended Warranty Fee","$200"],["Sold Separately?","Yes — optional"]],total:["Performance Obligation?","ASSESS"]},
+    options:["An assurance warranty — accrue as a cost","A service-type warranty — a separate performance obligation deferred over 2 years","Recognize the $200 immediately when purchased","Excluded from ASC 606 as an insurance product"],
+    answer:1,
+    explain:"An optional extended warranty provides services beyond merely assuring the product works. It is a service-type warranty and a distinct performance obligation. The $200 fee is deferred and recognized ratably over the 2-year extended period."
+  },
+  // ── CONSIGNMENTS & BILL-AND-HOLD ─────────────────────────────
+  {
+    topic:"Consignments & Bill-and-Hold",
+    q:"Meridian ships 500 units to a retail partner on consignment. The retailer has sold 120 units so far. How much revenue should Meridian recognize?",
+    doc:{title:"CONSIGNMENT INVENTORY REPORT",stamp:"CONSIGNMENT",rows:[["Units Shipped to Retailer","500"],["Units Sold to End Customers","120"],["Units Still at Retailer","380"],["Control Transferred to Retailer?","No — consignment"]],total:["Revenue Recognizable","?"]},
+    options:["500 units — revenue at shipment to retailer","120 units — only for goods sold to end customers","380 units — unsold inventory","250 units — half of shipped"],
+    answer:1,
+    explain:"In a consignment, the consignor (Meridian) retains control until the consignee sells goods to end customers. Control has only transferred for 120 units — so revenue is recognized only for those 120 units sold."
+  },
+  {
+    topic:"Consignments & Bill-and-Hold",
+    q:"A client requests Meridian bill them now for $150,000 of equipment but asks Meridian to hold it in their warehouse for 90 days. Which criterion must be met for revenue recognition?",
+    doc:{title:"BILL-AND-HOLD ARRANGEMENT #BH-12",stamp:"BILL AND HOLD",rows:[["Client Request","Bill now, deliver in 90 days"],["Product Separated","Yes — tagged for client"],["Product Ready","Yes — passed QC"],["Meridian May Redirect?","Under review"]],total:["Revenue Recognizable?","EVALUATE CRITERIA"]},
+    options:["Meridian must have the right to use the product while holding it","The product must be separately identified as the client's and ready for transfer","The client must provide a written directive to hold","The hold period must be less than 60 days"],
+    answer:1,
+    explain:"For bill-and-hold revenue recognition: (1) there must be a substantive reason (e.g., client requested it), (2) the product must be separately identified as the client's, (3) it must be ready for transfer, and (4) Meridian cannot use or redirect it. Meridian retaining the RIGHT to use the product would disqualify the arrangement."
+  }
+];
+
+/* ================================================================
+   BACKGROUND CANVAS — floating document fragments
+   ================================================================ */
+(function initCanvas(){
+  const canvas=document.getElementById('bg-canvas');
+  const ctx=canvas.getContext('2d');
+  const fragments=[
+    'REVENUE RECOGNITION','ASC 606-10-25','INVOICE #4821',
+    'DEBIT  CR  1,200.00','NET TERMS: 30',
+    'PERFORMANCE OBLIGATION','CONTRACT ASSET',
+    'ACCOUNTS RECEIVABLE','DEFERRED REVENUE',
+    'FMV: $45,000','SSP: $12,000','FOB DESTINATION',
+    'VARIABLE CONSIDERATION','AUDIT FINDING REF: 7.2',
+    'PRINCIPAL ARRANGEMENT','OVER-TIME RECOGNITION',
+    '% COMPLETE: 40%','COST-TO-COST METHOD',
+    'CONTRACT LIABILITY','CONSIGNMENT INVENTORY',
+    'STEP 3 OF 5','STANDALONE SELLING PRICE',
+    'CUMULATIVE CATCH-UP','PRACTICAL EXPEDIENT',
+    '▸ ENGAGE  ▸ REVIEW  ▸ CONCLUDE',
+  ];
+  let particles=[];
+  function resize(){
+    canvas.width=window.innerWidth;
+    canvas.height=window.innerHeight;
+  }
+  function spawn(){
+    particles.push({
+      text:fragments[Math.floor(Math.random()*fragments.length)],
+      x:Math.random()*canvas.width,
+      y:canvas.height+20,
+      opacity:0,
+      speed:.25+Math.random()*.4,
+      size:.55+Math.random()*.35,
+      drift:(Math.random()-.5)*.4,
+      life:0,maxLife:280+Math.random()*200
+    });
+  }
+  function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.font='11px "Share Tech Mono", monospace';
+    particles=particles.filter(p=>{
+      p.life++;p.y-=p.speed;p.x+=p.drift;
+      const prog=p.life/p.maxLife;
+      p.opacity=prog<.15?prog/.15:prog>.75?(1-prog)/.25:1;
+      ctx.globalAlpha=p.opacity*.35;
+      ctx.fillStyle='#3d5068';
+      ctx.save();
+      ctx.translate(p.x,p.y);
+      ctx.scale(p.size,p.size);
+      ctx.fillText(p.text,0,0);
+      ctx.restore();
+      return p.life<p.maxLife;
+    });
+    ctx.globalAlpha=1;
+    requestAnimationFrame(draw);
+  }
+  resize();
+  window.addEventListener('resize',resize);
+  setInterval(spawn,400);
+  draw();
+})();
+
+/* ================================================================
+   GAME ENGINE
+   ================================================================ */
+const RISK_WRONG=5, RISK_TIMEOUT=5, Q_TIME=30;
+let questions=[], idx=0, correct=0, wrong=0, risk=0;
+let timerInt=null, timeLeft=0, answered=false;
+const $=id=>document.getElementById(id);
+
+function shuffle(a){return a.slice().sort(()=>Math.random()-.5)}
+
+function startGame(){
+  questions=shuffle(ALL_QUESTIONS);
+  idx=0;correct=0;wrong=0;risk=0;
+  $('ss').classList.remove('active');
+  $('es').classList.remove('active');
+  $('hud-bar').style.display='block';
+  $('risk-panel').style.display='block';
+  $('game-card').style.display='block';
+  updateHUD();updateRisk();loadQ();
+}
+function restartGame(){$('es').classList.remove('active');startGame()}
+
+function updateHUD(){
+  $('hv-c').textContent=correct;
+  $('hv-w').textContent=wrong;
+  $('hv-n').textContent=(idx+1)+'/'+questions.length;
+}
+function updateRisk(){
+  const r=Math.min(risk,100);
+  $('risk-fill').style.width=r+'%';
+  $('risk-fill').style.backgroundPosition=(r*3)+'% 0%';
+  $('risk-val').textContent=r+'%';
+  $('risk-val').style.color=r>60?'#c0392b':r>30?'#e67e22':'#c9a43a';
+}
+
+/* Build animated document snippet */
+function buildDoc(doc){
+  if(!doc) return '<span style="color:var(--ink-faint);font-style:italic">No supporting document for this question.</span>';
+  let stamp=doc.stamp?`<span class="doc-stamp">${doc.stamp}</span>`:'';
+  let rows=doc.rows.map((r,i)=>
+    `<div class="doc-row" style="animation-delay:${.1+i*.07}s">
+      <span class="dc">${r[0]}</span>
+      <span class="dv typing" style="animation-delay:${.2+i*.09}s">${r[1]}</span>
+    </div>`).join('');
+  let total=doc.total?
+    `<div class="doc-total">
+      <span class="dc">${doc.total[0]}</span>
+      <span class="dv">${doc.total[1]}</span>
+    </div>`:'';
+  return `<div class="doc-header">${doc.title}${stamp}</div>${rows}${total}`;
+}
+
+/* Reference codes for corner stamps */
+const REFS=['MER-001','MER-002','MER-003','MER-004','MER-005',
+  'MER-006','MER-007','MER-008','MER-009','MER-010',
+  'MER-011','MER-012','MER-013','MER-014','MER-015',
+  'MER-016','MER-017','MER-018','MER-019','MER-020',
+  'MER-021','MER-022','MER-023','MER-024','MER-025',
+  'MER-026','MER-027','MER-028','MER-029','MER-030'];
+
+function loadQ(){
+  answered=false;
+  const q=questions[idx];
+  $('cs-ref').textContent='REF: '+REFS[idx];
+  $('cs-step').textContent=q.topic.split('·')[0].trim().toUpperCase();
+  $('cs-date').textContent='FY 2025';
+  $('q-topic').textContent=q.topic;
+  $('q-text').textContent=q.q;
+  $('q-text').style.animation='none';
+  void $('q-text').offsetWidth;
+  $('q-text').style.animation='';
+  $('doc-preview').innerHTML=buildDoc(q.doc);
+  $('expl').style.display='none';
+  $('expl').className='';
+  $('next-btn').style.display='none';
+
+  const C=$('opts'); C.innerHTML='';
+  const L=['A','B','C','D'];
+  const sh=q.options.map((o,i)=>({text:o,orig:i})).sort(()=>Math.random()-.5);
+  sh.forEach((o,i)=>{
+    const b=document.createElement('button');
+    b.className='opt';
+    b.innerHTML=`<span class="ltr">${L[i]}</span><span>${o.text}</span>`;
+    b.dataset.orig=o.orig;
+    b.addEventListener('click',()=>handleAns(b,o.orig,q));
+    C.appendChild(b);
+  });
+  updateHUD();
+  startTimer();
+}
+
+function startTimer(){
+  clearInterval(timerInt);
+  timeLeft=Q_TIME;
+  const fill=$('t-fill'),num=$('t-num');
+  fill.style.transition='none';
+  fill.style.width='100%';
+  fill.style.backgroundColor='var(--green)';
+  fill.style.boxShadow='0 0 6px var(--green)';
+  num.textContent='0:'+pad(Q_TIME);
+  num.style.color='var(--ink-dim)';
+  setTimeout(()=>{fill.style.transition='width 1s linear,background-color .4s,box-shadow .4s'},60);
+  timerInt=setInterval(()=>{
+    timeLeft--;
+    const p=(timeLeft/Q_TIME)*100;
+    fill.style.width=p+'%';
+    if(p<25){
+      fill.style.backgroundColor='var(--red)';
+      fill.style.boxShadow='0 0 10px var(--red)';
+      num.style.color='var(--red)';
+    } else if(p<55){
+      fill.style.backgroundColor='var(--amber)';
+      fill.style.boxShadow='0 0 8px var(--amber)';
+      num.style.color='var(--amber)';
+    }
+    num.textContent='0:'+pad(timeLeft);
+    if(timeLeft<=0){clearInterval(timerInt);if(!answered)timeout()}
+  },1000);
+}
+function pad(n){return String(n).padStart(2,'0')}
+
+function timeout(){
+  answered=true;risk=Math.min(risk+RISK_TIMEOUT,100);wrong++;
+  updateHUD();updateRisk();
+  document.querySelectorAll('.opt').forEach(b=>{
+    b.disabled=true;
+    if(+b.dataset.orig===questions[idx].answer) b.classList.add('correct');
+  });
+  showExpl(questions[idx].explain,'timeout');
+  shakeCard();
+}
+
+function handleAns(btn,origIdx,q){
+  if(answered)return;
+  answered=true;clearInterval(timerInt);
+  const ok=(origIdx===q.answer);
+  document.querySelectorAll('.opt').forEach(b=>{
+    b.disabled=true;
+    if(+b.dataset.orig===q.answer) b.classList.add('correct');
+  });
+  if(!ok){
+    btn.classList.add('wrong');
+    risk=Math.min(risk+RISK_WRONG,100);
+    wrong++;
+    shakeCard();
+  } else {
+    correct++;
+    spawnXP();
+    pulseCard();
+  }
+  updateHUD();updateRisk();
+  showExpl(q.explain,ok?'correct':'wrong');
+}
+
+function showExpl(text,type){
+  const box=$('expl');
+  box.style.display='block';
+  box.className='expl-'+type;
+  const icons={correct:'✓',wrong:'✗',timeout:'⏱'};
+  const labels={correct:'Correct!',wrong:'Incorrect.',timeout:"Time's Up!"};
+  box.innerHTML=`<strong>${icons[type]} ${labels[type]}</strong> ${text}`;
+  $('next-btn').style.display='inline-block';
+  setTimeout(()=>box.scrollIntoView({behavior:'smooth',block:'nearest'}),120);
+}
+
+function nextQ(){
+  idx++;
+  if(idx>=questions.length){endGame();return}
+  loadQ();
+  document.querySelector('.game-card').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+/* Visual effects */
+function spawnXP(){
+  const el=document.createElement('div');
+  el.className='xp-pop';el.textContent='+XP';
+  el.style.color='var(--green)';
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),950);
+}
+function pulseCard(){
+  const c=document.querySelector('.game-card');
+  c.classList.remove('flash-correct','flash-wrong');
+  void c.offsetWidth;
+  c.classList.add('flash-correct');
+}
+function shakeCard(){
+  const c=document.querySelector('.game-card');
+  c.classList.remove('flash-correct','flash-wrong');
+  void c.offsetWidth;
+  c.classList.add('flash-wrong');
+  // brief shake
+  c.animate([
+    {transform:'translateX(0)'},{transform:'translateX(-6px)'},
+    {transform:'translateX(5px)'},{transform:'translateX(-4px)'},
+    {transform:'translateX(3px)'},{transform:'translateX(0)'}
+  ],{duration:350,easing:'ease-out'});
+}
+
+function endGame(){
+  clearInterval(timerInt);
+  $('hud-bar').style.display='none';
+  $('risk-panel').style.display='none';
+  $('game-card').style.display='none';
+  const total=questions.length, pct=Math.round((correct/total)*100);
+  $('fc-c').textContent=correct;
+  $('fc-w').textContent=wrong;
+  $('fc-r').textContent=Math.min(risk,100)+'%';
+  let icon,title,msg;
+  if(pct>=90&&risk<=15){
+    icon='🏆';title='Clean Audit Opinion';
+    msg=`Outstanding, Auditor Vex. You answered ${correct} of ${total} correctly with near-zero audit risk. Meridian Corp's books are pristine. The partners are pleased.`;
+  } else if(pct>=75){
+    icon='📋';title='Qualified Opinion';
+    msg=`Solid work — ${correct} of ${total} correct. A few findings have been noted. Review performance obligations and variable consideration before the next engagement.`;
+  } else if(pct>=50){
+    icon='⚠️';title='Adverse Opinion';
+    msg=`${correct} of ${total} correct. Audit Risk is elevated. Meridian Corp's CFO is nervous. Revisit Steps 2–5 of the five-step model before proceeding.`;
+  } else {
+    icon='🚨';title='Material Weakness Detected';
+    msg=`${correct} of ${total} correct. The audit has uncovered serious issues. Return to the ASC 606 framework from the beginning. Auditor Vex must train harder.`;
+  }
+  $('end-icon').textContent=icon;
+  $('et').textContent=title;
+  $('verdict').textContent=msg;
+  $('es').classList.add('active');
+  $('es').scrollIntoView({behavior:'smooth',block:'start'});
+}
+</script>
+</body>
+</html>
